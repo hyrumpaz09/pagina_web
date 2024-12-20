@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tomar Fotos y Enviar PDF por Correo</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-light">
+  <div class="container py-4 text-center">
+    <h1 class="mb-4">Tomar Fotos, Agregar Texto y Enviar PDF</h1>
+
+    <!-- Video -->
+    <div class="row justify-content-center mb-3">
+      <div class="col-md-8 col-12">
+        <video id="video" autoplay playsinline class="w-100 rounded border"></video>
+      </div>
+    </div>
+
+    <!-- Botones -->
+    <div class="d-flex justify-content-center gap-3 mb-4 flex-wrap">
+      <button id="captureBtn" class="btn btn-primary">📸 Tomar Foto</button>
+      <button id="downloadPdfBtn" class="btn btn-success">📄 Descargar PDF</button>
+      <button id="emailPdfBtn" class="btn btn-danger">✉️ Enviar por Correo</button>
+    </div>
+
+    <!-- Contenedor de Fotos y Campos de Texto -->
+    <div id="photosContainer" class="row justify-content-center gap-3"></div>
+
+    <!-- Enlace Visible del PDF -->
+    <div id="pdfLinkContainer" class="mt-4" style="display: none;">
+      <p class="text-info">Tu PDF está listo. Puedes descargarlo y adjuntarlo en Gmail:</p>
+      <a id="pdfDownloadLink" href="#" class="btn btn-link">Descargar PDF</a>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    const video = document.getElementById('video');
+    const captureBtn = document.getElementById('captureBtn');
+    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+    const emailPdfBtn = document.getElementById('emailPdfBtn');
+    const photosContainer = document.getElementById('photosContainer');
+    const pdfLinkContainer = document.getElementById('pdfLinkContainer');
+    const pdfDownloadLink = document.getElementById('pdfDownloadLink');
+
+    const { jsPDF } = window.jspdf;
+    let photos = []; // Almacena las fotos y sus textos
+    let pdfDataUri = ''; // Base64 del PDF generado
+
+    // Acceder a la cámara
+	  
+	  async function startCamera() {
+  try {
+    const constraints = {
+      video: { facingMode: "environment" }, // Cámara trasera
+      audio: false
+    };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+  } catch (error) {
+    console.error("Error al acceder a la cámara:", error);
+    alert(`Error al acceder a la cámara: ${error.message}`);
+  }
+}
+
+startCamera();
+
+	  
+    // Tomar una foto
+    captureBtn.addEventListener('click', () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const photoData = canvas.toDataURL('image/png');
+      const photoId = `photo-${Date.now()}`;
+
+      // Guardar la foto
+      photos.push({ id: photoId, image: photoData, text: '' });
+
+      // Mostrar la foto y un campo de texto
+      const photoWrapper = document.createElement('div');
+      photoWrapper.className = 'col-6 col-md-3 text-center';
+      photoWrapper.innerHTML = `
+        <img src="${photoData}" class="img-thumbnail mb-2">
+        <input type="text" class="form-control" placeholder="Texto para esta foto" id="${photoId}">
+      `;
+      photosContainer.appendChild(photoWrapper);
+
+      // Guardar texto
+      document.getElementById(photoId).addEventListener('input', (e) => {
+        const photo = photos.find(p => p.id === photoId);
+        if (photo) photo.text = e.target.value;
+      });
+    });
+
+    // Generar PDF
+    function generatePDF() {
+      const pdf = new jsPDF();
+      photos.forEach((photo, index) => {
+        if (index > 0) pdf.addPage();
+        pdf.addImage(photo.image, 'PNG', 10, 10, 190, 120);
+        pdf.setFontSize(12);
+        pdf.text(photo.text || 'Sin texto', 10, 140);
+      });
+
+      pdfDataUri = pdf.output('datauristring'); // Guarda el PDF como base64
+      pdfLinkContainer.style.display = 'block'; // Muestra el enlace
+      pdfDownloadLink.href = pdfDataUri;
+      pdfDownloadLink.download = 'fotos_con_texto.pdf';
+    }
+
+    // Descargar PDF
+    downloadPdfBtn.addEventListener('click', () => {
+      generatePDF();
+    });
+
+    // Enviar por Correo
+    emailPdfBtn.addEventListener('click', () => {
+      if (!pdfDataUri) generatePDF();
+
+      const subject = encodeURIComponent('PDF Generado desde Aplicación');
+      const body = encodeURIComponent('Adjunto el PDF generado con fotos y texto. Por favor, revisa el archivo.');
+      
+      const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
+      window.location.href = mailtoLink;
+    });
+  </script>
+</body>
+</html>
